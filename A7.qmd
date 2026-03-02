@@ -1,0 +1,121 @@
+---
+title: "A7"
+author: "Kesh Muthu"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+## Loading Libraries
+
+```{r}
+#| warning: false
+
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+```
+
+## Loading and Glimpsing Dataset
+
+```{r}
+
+kaggle_df <- read.csv("kaggle.csv")
+glimpse(kaggle_df)
+```
+
+## Data Processing
+
+```{r}
+kaggle_df <- kaggle_df |>
+  mutate(
+    deadline_date = as.Date(deadline),
+    launched_date = as.Date(launched),
+    deadline_year = format(deadline_date, "%Y"),
+    launched_year = format(launched_date, "%Y")
+  )
+
+glimpse(kaggle_df)
+```
+
+## Initial Calculations
+
+```{r}
+
+total_projects <- nrow(kaggle_df)
+successful_projects <- kaggle_df |>
+  filter(state == "successful") |>
+  nrow()
+failed_projects <- kaggle_df |>
+  filter(state == "failed") |>
+  nrow()
+percent_failed <- round(failed_projects/total_projects * 100, 2)
+```
+
+## Analysis
+
+From the Kaggle dataset of Kickstarter projects, there seems to be `r total_projects` projects. Of those, around `r successful_projects` projects were successful, meaning that they got the full funding needed from users to complete or fund the project. Another `r failed_projects` projects were failed projects. This means that they did not raise enough money to continue through with the project. When comparing with the total number of projects, this represents a total of `r percent_failed`% of projects that failed.
+
+## Biggest Non-Success Project
+
+```{r}
+
+biggest_non_success <- kaggle_df |>
+  filter(state != "successful") |>
+  filter(usd_pledged_real == max(usd_pledged_real, na.rm = TRUE))
+
+```
+
+The biggest non-success project is the `r biggest_non_success$name`. It was developed by Skarp Technologies, a company from Irvine, California. It raised almost \$`r format(round(biggest_non_success$usd_pledged_real))` USD. It was suspended from Kickstarter because it was in violation of the community terms.
+
+## Project State
+
+```{r}
+states <- kaggle_df |>
+  group_by(state) |>
+  summarize(count = n())
+
+ggplot(states, aes(x = state, y = count)) +
+  geom_col() +
+  labs(
+    title = "Number of Projects by State of Project",
+    x = "Project State",
+    y = "Number of Projects"
+  )
+```
+
+From this bar chart, we see that a majority of projects fail, get suspended, or get cancelled. While successful projects are there, it seems that very few make it to the live state. We can see why 52% of projects are failures, because they don't get enough funding. Most projects which get cancelled we can assume are in violation of community terms. I wonder why there is so few successful projects that make it to live projects.
+
+## Yearly Summary
+
+```{r}
+year_summary_df <- kaggle_df |>
+  group_by(launched_year) |>
+  summarize(
+    count = n(),
+    successes = sum(state == "successful"),
+    percent_success = round((successes/count * 100), 2),
+    total_pledged = format(sum(usd.pledged, na.rm = TRUE))
+  )
+
+print(year_summary_df)
+```
+
+I handled year by first grouping by the Kickstarter fund launch year. This is so I can easily summarize by years later on and also count the number of projects per year. I handled the `percent_success` variable by using the number of projects per year (failed or successful) and then counting the number of successful projects that year. I then divided the number of successful projects by the number of total projects per year to get the ratio, which I then multiplied by 100. Then I wanted to find out the total pledged per year, which I did by summing the `usd.pledged` column for each year. All of these choices were carefully thought out so I can correctly get the values for each year without breaking the code. I chose to see how much was pledged per year because I was curious to see which year had the highest pledge amount in USD.
+
+## Visualizing
+
+```{r}
+ggplot(year_summary_df, aes(x = factor(launched_year), y = percent_success)) +
+  geom_col() +
+  labs(
+    title = "Project Success Rates by Year",
+    x = "Launched Year",
+    y = "Percent Success (%)"
+  )
+```
+
+## Analysis
+
+Before adding `r na.rm = TRUE` to my sum function, between 2012 - 2016, there were a few columns that made it so the entire pledged amount column came out to NA. I think this is because certain projects were never translated over to USD amounts, leaving them NA. Another interesting thing is that the data stops being counted between 1970 and 2009. After researching online, I found out that Kickstarter was started in 2009, so I am curious to see why there was data from 1970. My guess for the NA values however is that the project was either falsely marked as a success or it never got funded enough to have a USD translation. My question to the dataset is why does 2011 have the highest amount of funding? The years after progressively get worse for funding.
